@@ -5,4 +5,4 @@ from app.routers import server as server_router
 
 app=FastAPI()
 
-app.include_router(server_router.router)
+app.include_router(server_router.router, prefix="/inventory",tags=["inventory"])

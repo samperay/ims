@@ -1,105 +1,164 @@
-# Description: This is the main file for the FastAPI application. It contains the code for the FastAPI application and the server inventory data.
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-
+from app.db.database import engine, sessionLocal
+import app.model.models as models
+from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload
+from app.db.curd import get_server_by_hostname
 
 router=APIRouter()
 
+
+models.Base.metadata.create_all(bind=engine)
+
+def get_db():
+    db = sessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+        
 class Storage(BaseModel):
     total_capacity_gb: int = Field(gt=0,le=10000, description="Total storage capacity in GB")
     used_capacity_gb: int = Field(ge=0,le=10000, description="Used storage capacity in GB")
     free_capacity_gb: int = Field(ge=0,le=10000, description="Free storage capacity in GB")
     disk_type: str = Field(description="Type of disk storage (e.g. SSD, HDD)")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "total_capacity_gb": 500,
+                "used_capacity_gb": 200,
+                "free_capacity_gb": 300,
+                "disk_type": "SSD"
+            }
+        }
 
 class Server(BaseModel):
-    hostname: str
-    short_name: str
-    ip_address: str
-    os: str
-    os_version: str
-    cpu_model: str
-    cpu_cores: int
-    ram_gb: int
-    storage: Storage
-    location: str
-    owner: str
-    status: str
-
-server_database = {
-  "servers": [
-    {
-      "hostname": "server1.example.com",
-      "short_name": "server1",
-      "ip_address": "192.168.1.101",
-      "os": "Linux",
-      "os_version": "Ubuntu 20.04",
-      "cpu_model": "Intel Xeon E5-2670",
-      "cpu_cores": 8,
-      "ram_gb": 16,
-      "storage": {
-        "total_capacity_gb": 500,
-        "used_capacity_gb": 200,
-        "free_capacity_gb": 300,
-        "disk_type": "SSD"
-      },
-      "location": "Data Center A",
-      "owner": "IT Department",
-      "status": "active"
-    },
-    {
-      "hostname": "server2.example.com",
-      "short_name": "server2",
-      "ip_address": "192.168.1.102",
-      "os": "Windows",
-      "os_version": "Windows Server 2019",
-      "cpu_model": "Intel Core i7-8700",
-      "cpu_cores": 6,
-      "ram_gb": 32,
-      "storage": {
-        "total_capacity_gb": 1000,
-        "used_capacity_gb": 400,
-        "free_capacity_gb": 600,
-        "disk_type": "HDD"
-      },
-      "location": "Data Center B",
-      "owner": "Finance Department",
-      "status": "active"
-    }
-  ]
-}
+    hostname: str = Field(description="Fully qualified domain name (FQDN) of the server")
+    short_name: str = Field(description="Short name of the server")
+    ip_address: str = Field(description="IP address of the server")
+    os: str = Field(description="Operating system of the server")
+    os_version: str = Field(description="Version of the operating system")
+    cpu_model: str = Field(description="Model of the CPU")
+    cpu_cores: int = Field(gt=0,le=108, description="Number of CPU cores")
+    ram_gb: int = Field(gt=0,le=1000, description="Amount of RAM in GB")
+    storage: Storage = Field(description="Storage details")
+    location: str = Field(description="Location of the server")
+    owner: str = Field(description="Owner of the server")
+    status: str = Field(description="Status of the server")
+    
+    class Config:
+        json_schema_extra = {
+          "example": {
+            "hostname": "server3.example.com",
+            "short_name": "server3",
+            "ip_address": "192.168.56.103",
+            "os": "Linux",
+            "os_version": "Ubuntu 20.04",
+            "cpu_model": "Intel Xeon E5-2670",
+            "cpu_cores": 8,
+            "ram_gb": 16,
+            "storage": {
+              "total_capacity_gb": 500,
+              "used_capacity_gb": 200,
+              "free_capacity_gb": 300,
+              "disk_type": "SSD"
+            },
+            "location": "Data Center A",
+            "owner": "IT Department",
+            "status": "active"
+        }
+        }
 
 
 
-@router.get("/")
-def list_server_inventory():
-    return server_database.get("servers")
+@router.get("/", status_code=200, description="List all servers in inventory")
+async def list_all_servers(db: Annotated[Session, Depends(get_db)]): 
+    servers = db.query(models.Servers).options(joinedload(models.Servers.storage)).all()   
+    if servers is None:
+        raise HTTPException(status_code=404, detail="No servers found")
+    return servers
+
+@router.get("/{hostname}")
+async def get_server_by_hostname(hostname:str, db:Annotated[Session, Depends(get_db)]):
+    server = db.query(models.Servers).filter(models.Servers.hostname == hostname).first()
+    if server is None:
+        raise HTTPException(status_code=404, detail="Server not found")
+    return db.query(models.Servers).filter(models.Servers.hostname == hostname).options(joinedload(models.Servers.storage)).first()
 
 
-@router.get("/server/{hostname}", response_model=Server, status_code=200)
-async def get_server_by_hostname(hostname: str):
-    for server in server_database.get("servers"):
-        if server.get("hostname") == hostname or server.get("short_name") == hostname.split(".")[0]:
-            return server
-    raise HTTPException(status_code=404, detail="Server not found")
-        
-@router.post("/server", response_model=Server, status_code=201)
-async def add_server_to_inventory(server: dict):
-    server_database.get("servers").append(server)
+@router.post("/", status_code=201, description="Create new server to inventory")
+async def create_server(server_data:Server, db:Annotated[Session, Depends(get_db)]):
+    server = models.Servers(
+        hostname=server_data.hostname,
+        short_name=server_data.short_name,
+        ip_address=server_data.ip_address,
+        os=server_data.os,
+        os_version=server_data.os_version,
+        cpu_model=server_data.cpu_model,
+        cpu_cores=server_data.cpu_cores,
+        ram_gb=server_data.ram_gb,
+        location=server_data.location,
+        owner=server_data.owner,
+        status=server_data.status
+    )
+    
+    storage_data = server_data.storage
+    storage = models.Storage(
+        disk_type=storage_data.disk_type,
+        free_capacity_gb=storage_data.free_capacity_gb,
+        total_capacity_gb=storage_data.total_capacity_gb,
+        used_capacity_gb=storage_data.used_capacity_gb
+    )
+    
+    server.storage.append(storage)
+    
+    db.add(server)
+    db.add(storage)
+    db.commit()
+    db.refresh(server)
+    
     return server
 
+@router.put("/{hostname}", status_code=200, description="Update an existing server inventory")
+async def update_server(hostname:str, server_data:Server, db:Annotated[Session, Depends(get_db)]):
+    server = db.query(models.Servers).filter(models.Servers.hostname == hostname).first()
+    if server is None:
+        raise HTTPException(status_code=404, detail="Server not found")
+    
+    server.short_name = server_data.short_name
+    server.ip_address = server_data.ip_address
+    server.os = server_data.os
+    server.os_version = server_data.os_version
+    server.cpu_model = server_data.cpu_model
+    server.cpu_cores = server_data.cpu_cores
+    server.ram_gb = server_data.ram_gb
+    server.location = server_data.location
+    server.owner = server_data.owner
+    server.status = server_data.status
+    
+    storage_data = server_data.storage
+    storage = db.query(models.Storage).filter(models.Storage.server_id == server.id).first()
+    storage.disk_type = storage_data.disk_type
+    storage.free_capacity_gb = storage_data.free_capacity_gb
+    storage.total_capacity_gb = storage_data.total_capacity_gb
+    storage.used_capacity_gb = storage_data.used_capacity_gb
+    
+    db.commit()
+    db.refresh(server)
+    
+    return server
 
-@router.delete("/server/{hostname}", status_code=204)
-async def delete_server_from_inventory(hostname: str):
-    for server in server_database.get("servers"):
-        if server.get("hostname") == hostname or server.get("short_name") == hostname.split(".")[0]:
-            server_database.get("servers").remove(server)
-            return {"message": "Server deleted successfully"}
-    raise HTTPException(status_code=404, detail="Server not found")
-
-@router.put("/server/{hostname}", response_model=Server, status_code=201)
-async def update_server_inventory(hostname: str, server: Server):
-    for server_data in server_database.get("servers"):
-        if server_data.get("hostname") == hostname or server_data.get("short_name") == hostname.split(".")[0]:
-            server_data.update(server.model_dump())
-            return server_data
-        raise HTTPException(status_code=404, detail="server not found")
+@router.delete("/{hostname}", status_code=200, description="Delete an existing server from inventory")
+async def delete_server(hostname:str, db:Annotated[Session, Depends(get_db)]):
+    server = db.query(models.Servers).filter(models.Servers.hostname == hostname).first()
+    if server is None:
+        raise HTTPException(status_code=404, detail="Server not found")
+    
+    db.delete(server)
+    db.commit()
+    
+    return {"message": "Server deleted successfully"}
+    
