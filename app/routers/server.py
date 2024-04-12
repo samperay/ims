@@ -1,11 +1,12 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from app.db.database import engine, sessionLocal
 import app.model.models as models
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 from app.db.curd import get_server_by_hostname
+
 
 router=APIRouter()
 
@@ -18,6 +19,8 @@ def get_db():
         yield db
     finally:
         db.close()
+        
+db_dependency = Annotated[Session, Depends(get_db)]
         
 class Storage(BaseModel):
     total_capacity_gb: int = Field(gt=0,le=10000, description="Total storage capacity in GB")
@@ -74,23 +77,23 @@ class Server(BaseModel):
 
 
 
-@router.get("/", status_code=200, description="List all servers in inventory")
-async def list_all_servers(db: Annotated[Session, Depends(get_db)]): 
+@router.get("/", status_code=status.HTTP_200_OK, description="List all servers in inventory")
+async def list_all_servers(db: db_dependency): 
     servers = db.query(models.Servers).options(joinedload(models.Servers.storage)).all()   
     if servers is None:
         raise HTTPException(status_code=404, detail="No servers found")
     return servers
 
-@router.get("/{hostname}")
-async def get_server_by_hostname(hostname:str, db:Annotated[Session, Depends(get_db)]):
+@router.get("/{hostname}", status_code=status.HTTP_200_OK, description="Get server by hostname")
+async def get_server_by_hostname(hostname:str, db:db_dependency):
     server = db.query(models.Servers).filter(models.Servers.hostname == hostname).first()
     if server is None:
         raise HTTPException(status_code=404, detail="Server not found")
     return db.query(models.Servers).filter(models.Servers.hostname == hostname).options(joinedload(models.Servers.storage)).first()
 
 
-@router.post("/", status_code=201, description="Create new server to inventory")
-async def create_server(server_data:Server, db:Annotated[Session, Depends(get_db)]):
+@router.post("/", status_code=status.HTTP_201_CREATED, description="Create new server to inventory")
+async def create_server(server_data:Server, db:db_dependency):
     server = models.Servers(
         hostname=server_data.hostname,
         short_name=server_data.short_name,
@@ -122,8 +125,8 @@ async def create_server(server_data:Server, db:Annotated[Session, Depends(get_db
     
     return server
 
-@router.put("/{hostname}", status_code=200, description="Update an existing server inventory")
-async def update_server(hostname:str, server_data:Server, db:Annotated[Session, Depends(get_db)]):
+@router.put("/{hostname}", status_code=status.HTTP_200_OK, description="Update an existing server inventory")
+async def update_server(hostname:str, server_data:Server, db:db_dependency):
     server = db.query(models.Servers).filter(models.Servers.hostname == hostname).first()
     if server is None:
         raise HTTPException(status_code=404, detail="Server not found")
@@ -151,8 +154,8 @@ async def update_server(hostname:str, server_data:Server, db:Annotated[Session, 
     
     return server
 
-@router.delete("/{hostname}", status_code=200, description="Delete an existing server from inventory")
-async def delete_server(hostname:str, db:Annotated[Session, Depends(get_db)]):
+@router.delete("/{hostname}", status_code=status.HTTP_200_OK, description="Delete an existing server from inventory")
+async def delete_server(hostname:str, db:db_dependency):
     server = db.query(models.Servers).filter(models.Servers.hostname == hostname).first()
     if server is None:
         raise HTTPException(status_code=404, detail="Server not found")
