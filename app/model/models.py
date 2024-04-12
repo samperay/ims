@@ -19,6 +19,7 @@ class Servers(Base):
     owner=Column(String)
     status=Column(String)
     storage=Column(String)
+    userid = Column(Integer, ForeignKey('users.id'))
     
     storage = relationship("Storage", back_populates="server")
     

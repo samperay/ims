@@ -51,7 +51,7 @@ def get_current_user(token: Annotated[str,Depends(oauth2_bearer)]):
         username: str = payload.get("sub")
         userid = payload.get("user_id")
         if username is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
+            
         return {"username": username, "id": userid}
     except JWTError:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
@@ -69,7 +69,7 @@ class Token(BaseModel):
     token_type: str
 
 
-# @router.get("/")
+# @router.get("/")raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
 # async def get_users(db:db_dependency):
 #     users = db.query(models.Users).all()
 #     return users

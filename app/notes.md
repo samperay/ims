@@ -103,7 +103,8 @@
     ram_gb INTEGER,
     location TEXT,
     owner TEXT,
-    status TEXT
+    status TEXT,
+    userid TEXT
 );
 
 CREATE TABLE storage (
@@ -117,11 +118,11 @@ CREATE TABLE storage (
 ); -->
 
 
-<!-- INSERT INTO servers (hostname, short_name, ip_address, os, os_version, cpu_model, cpu_cores, ram_gb, location, owner, status)
+<!-- INSERT INTO servers (hostname, short_name, ip_address, os, os_version, cpu_model, cpu_cores, ram_gb, location, owner, status, userid)
 VALUES 
-    ('server1', 's1', '192.168.1.1', 'Linux', 'Ubuntu 20.04', 'Intel Xeon', 8, 16, 'Data Center 1', 'Admin', 'Active'),
-    ('server2', 's2', '192.168.1.2', 'Windows', 'Windows Server 2019', 'AMD Ryzen', 6, 32, 'Data Center 2', 'Dev', 'Active'),
-    ('server3', 's3', '192.168.1.3', 'Linux', 'CentOS 7', 'ARM Cortex', 4, 8, 'Office', 'User', 'Inactive');
+    ('server1', 's1', '192.168.1.1', 'Linux', 'Ubuntu 20.04', 'Intel Xeon', 8, 16, 'Data Center 1', 'Admin', 'Active',1),
+    ('server2', 's2', '192.168.1.2', 'Windows', 'Windows Server 2019', 'AMD Ryzen', 6, 32, 'Data Center 2', 'Dev', 'Active',1),
+    ('server3', 's3', '192.168.1.3', 'Linux', 'CentOS 7', 'ARM Cortex', 4, 8, 'Office', 'User', 'Inactive',2);
 
 
 INSERT INTO storage (server_id, total_capacity_gb, used_capacity_gb, free_capacity_gb, disk_type)

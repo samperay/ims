@@ -6,6 +6,7 @@ import app.model.models as models
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 from app.db.curd import get_server_by_hostname
+from .auth import get_current_user
 
 
 router=APIRouter()
@@ -21,6 +22,7 @@ def get_db():
         db.close()
         
 db_dependency = Annotated[Session, Depends(get_db)]
+user_dependency = Annotated[dict, Depends(get_current_user)]
         
 class Storage(BaseModel):
     total_capacity_gb: int = Field(gt=0,le=10000, description="Total storage capacity in GB")
@@ -51,6 +53,7 @@ class Server(BaseModel):
     location: str = Field(description="Location of the server")
     owner: str = Field(description="Owner of the server")
     status: str = Field(description="Status of the server")
+    userid: int = Field(description="User ID of the user who added the server inventory")
     
     class Config:
         json_schema_extra = {
@@ -63,6 +66,7 @@ class Server(BaseModel):
             "cpu_model": "Intel Xeon E5-2670",
             "cpu_cores": 8,
             "ram_gb": 16,
+            "userid": 1,
             "storage": {
               "total_capacity_gb": 500,
               "used_capacity_gb": 200,
@@ -72,6 +76,7 @@ class Server(BaseModel):
             "location": "Data Center A",
             "owner": "IT Department",
             "status": "active"
+            
         }
         }
 
@@ -93,7 +98,10 @@ async def get_server_by_hostname(hostname:str, db:db_dependency):
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED, description="Create new server to inventory")
-async def create_server(server_data:Server, db:db_dependency):
+async def create_server(server_data:Server, db:db_dependency, user:user_dependency):
+    if user is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
     server = models.Servers(
         hostname=server_data.hostname,
         short_name=server_data.short_name,
@@ -105,7 +113,8 @@ async def create_server(server_data:Server, db:db_dependency):
         ram_gb=server_data.ram_gb,
         location=server_data.location,
         owner=server_data.owner,
-        status=server_data.status
+        status=server_data.status,
+        userid=user.get("id")
     )
     
     storage_data = server_data.storage
