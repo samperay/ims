@@ -1,5 +1,5 @@
 from app.db.database import Base
-from sqlalchemy import Column, ForeignKey, String, Integer
+from sqlalchemy import Boolean, Column, ForeignKey, String, Integer
 from sqlalchemy.orm import relationship
 
 
@@ -35,5 +35,14 @@ class Storage(Base):
     server = relationship("Servers", back_populates="storage")
     
     
-    
+class Users(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String)
+    username = Column(String)
+    first_name = Column(String)
+    last_name = Column(String)
+    hashed_password = Column(String)
+    is_active = Column(Boolean, default=True)
+    role = Column(String)
     
