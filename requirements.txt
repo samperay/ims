@@ -3,3 +3,5 @@ uvicorn[standard]
 sqlalchemy
 passlib
 bcrypt==3.2.0
+python-multipart
+python-jose[cryptography]
