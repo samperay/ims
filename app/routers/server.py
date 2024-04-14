@@ -9,7 +9,7 @@ from app.db.curd import get_server_by_hostname
 from .auth import get_current_user
 
 
-router=APIRouter()
+router=APIRouter(prefix="/inventory",tags=["inventory"])
 
 
 models.Base.metadata.create_all(bind=engine)
@@ -85,6 +85,7 @@ class Server(BaseModel):
 @router.get("/", status_code=status.HTTP_200_OK, description="List all servers in inventory")
 async def list_all_servers(db: db_dependency): 
     servers = db.query(models.Servers).options(joinedload(models.Servers.storage)).all()   
+    # servers = db.query(models.Servers).options(joinedload(models.Servers.storage)).filter(models.Servers.userid == user.get("id")).all()
     if servers is None:
         raise HTTPException(status_code=404, detail="No servers found")
     return servers

@@ -38,8 +38,8 @@ def is_user_authenticated(username:str,password:str,db:Session):
         return False
     return user
 
-def create_access_token(username: str, user_id:int, expires_delta: timedelta):
-    to_encode = {"sub": username, "user_id": user_id}
+def create_access_token(username: str, user_id:int, role: str, expires_delta: timedelta):
+    to_encode = {"sub": username, "user_id": user_id, "role": role}
     expire = datetime.utcnow() + expires_delta
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRETKEY, algorithm=ALGORITH)
@@ -50,9 +50,9 @@ def get_current_user(token: Annotated[str,Depends(oauth2_bearer)]):
         payload = jwt.decode(token, SECRETKEY, algorithms=[ALGORITH])
         username: str = payload.get("sub")
         userid = payload.get("user_id")
-        if username is None:
-            
-        return {"username": username, "id": userid}
+        user_role = payload.get("role")
+        if username is not None:
+            return {"username": username, "id": userid, "user_role": user_role}
     except JWTError:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
 
@@ -64,15 +64,27 @@ class CreateUserRequest(BaseModel):
     password: str
     role: str
     
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "email": "user1@gmail.com",
+                "username": "user1",
+                "first_name": "user1",
+                "last_name": "user1",
+                "password": "test1234",
+                "role": "devops"
+            }
+        }
+    
 class Token(BaseModel):
     access_token: str
     token_type: str
 
 
-# @router.get("/")raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
-# async def get_users(db:db_dependency):
-#     users = db.query(models.Users).all()
-#     return users
+@router.get("/")
+async def get_users(db:db_dependency):
+    users = db.query(models.Users).all()
+    return users
 
 @router.post("/", description="Create a new user")
 async def create_user(db:db_dependency,create_user_request: CreateUserRequest):
@@ -92,38 +104,39 @@ async def create_user(db:db_dependency,create_user_request: CreateUserRequest):
     
     return create_user_model
 
-# @router.delete("/{username}")
-# async def delete_user(db:db_dependency,username:str):
-#     user = db.query(models.Users).filter(models.Users.username == username).first()
-#     if user:
-#         db.delete(user)
-#         db.commit()
-#         return {"message": "User deleted successfully"}
-#     else:
-#         return {"message": "User not found"}
+@router.delete("/{username}")
+async def delete_user(db:db_dependency,username:str):
+    user = db.query(models.Users).filter(models.Users.username == username).first()
+    print("User from delete auth route: ", user)
+    if user:
+        db.delete(user)
+        db.commit()
+        return {"message": "User deleted successfully"}
+    else:
+        return {"message": "User not found"}
     
-# @router.put("/{username}")
-# async def update_user(db:db_dependency,username:str,create_user_request: CreateUserRequest):
-#     user = db.query(models.Users).filter(models.Users.username == username).first()
-#     if user:
-#         user.email = create_user_request.email
-#         user.username = create_user_request.username
-#         user.first_name = create_user_request.first_name
-#         user.last_name = create_user_request.last_name
-#         user.hashed_password = bcrypt_context.hash(create_user_request.password)
-#         user.role = create_user_request.role
-#         db.commit()
-#         db.refresh(user)
-#         return user
-#     else:
-#         return {"message": "User not found"}
+@router.put("/{username}")
+async def update_user(db:db_dependency,username:str,create_user_request: CreateUserRequest):
+    user = db.query(models.Users).filter(models.Users.username == username).first()
+    if user:
+        user.email = create_user_request.email
+        user.username = create_user_request.username
+        user.first_name = create_user_request.first_name
+        user.last_name = create_user_request.last_name
+        user.hashed_password = bcrypt_context.hash(create_user_request.password)
+        user.role = create_user_request.role
+        db.commit()
+        db.refresh(user)
+        return user
+    else:
+        return {"message": "User not found"}
     
     
 @router.post("/token", response_model=Token, description="Login for access token")
-async def get_token_for_access(form_data: Annotated[OAuth2PasswordRequestForm, Depends()],db:db_dependency):
+async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()],db:db_dependency):
     user = is_user_authenticated(form_data.username,form_data.password,db)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
     
-    user_token = create_access_token(form_data.username,user.id,timedelta(minutes=30))
+    user_token = create_access_token(form_data.username,user.id,user.role,timedelta(minutes=30))
     return {"access_token": user_token, "token_type": "bearer"}
