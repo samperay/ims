@@ -45,3 +45,21 @@ def test_assert_raises():
         raise TypeError("This is a TypeError")
     with pytest.raises(ZeroDivisionError):
         raise ZeroDivisionError("This is a ZeroDivisionError")
+    
+
+class Student:
+    def __init__(self, first_name: str, last_name: str, major: str, year: int) -> None:
+        self.first_name = first_name
+        self.last_name = last_name
+        self.major = major
+        self.year = year
+        
+@pytest.fixture
+def student():
+    return Student("John", "Doe", "Computer Science", 2023)
+
+def test_student(student):
+    assert student.first_name == "John"
+    assert student.last_name == "Doe"
+    assert student.major == "Computer Science"
+    assert student.year == 2023
