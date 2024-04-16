@@ -18,23 +18,12 @@ class Servers(Base):
     location = Column(String)
     owner=Column(String)
     status=Column(String)
-    storage=Column(String)
-    userid = Column(Integer, ForeignKey('users.id'))
-    
-    storage = relationship("Storage", back_populates="server")
-    
-     
-class Storage(Base):
-    __tablename__ = 'storage'
-    id = Column(Integer, primary_key=True, index=True)
+    root_disk = Column(String)
+    root_disk_type = Column(String)
     total_capacity_gb = Column(String)
     used_capacity_gb = Column(String)
     free_capacity_gb = Column(String)
-    disk_type = Column(String)
-    server_id = Column(Integer, ForeignKey('servers.id'))
-    
-    server = relationship("Servers", back_populates="storage")
-    
+    userid = Column(Integer, ForeignKey('users.id'))
     
 class Users(Base):
     __tablename__ = 'users'

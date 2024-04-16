@@ -1,3 +1,4 @@
+from logging import root
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -24,21 +25,22 @@ def get_db():
 db_dependency = Annotated[Session, Depends(get_db)]
 user_dependency = Annotated[dict, Depends(get_current_user)]
         
-class Storage(BaseModel):
-    total_capacity_gb: int = Field(gt=0,le=10000, description="Total storage capacity in GB")
-    used_capacity_gb: int = Field(ge=0,le=10000, description="Used storage capacity in GB")
-    free_capacity_gb: int = Field(ge=0,le=10000, description="Free storage capacity in GB")
-    disk_type: str = Field(description="Type of disk storage (e.g. SSD, HDD)")
+# class Storage(BaseModel):
+#     total_capacity_gb: int = Field(gt=0,le=10000, description="Total storage capacity in GB")
+#     used_capacity_gb: int = Field(ge=0,le=10000, description="Used storage capacity in GB")
+#     free_capacity_gb: int = Field(ge=0,le=10000, description="Free storage capacity in GB")
+#     disk_type: str = Field(description="Type of disk storage (e.g. SSD, HDD)")
     
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "total_capacity_gb": 500,
-                "used_capacity_gb": 200,
-                "free_capacity_gb": 300,
-                "disk_type": "SSD"
-            }
-        }
+#     class Config:
+#         json_schema_extra = {
+#             "example": {
+#                 "total_capacity_gb": 500,
+#                 "used_capacity_gb": 200,
+#                 "free_capacity_gb": 300,
+#                 "disk_type": "SSD"
+#             }
+#         }
+
 
 class Server(BaseModel):
     hostname: str = Field(description="Fully qualified domain name (FQDN) of the server")
@@ -49,7 +51,11 @@ class Server(BaseModel):
     cpu_model: str = Field(description="Model of the CPU")
     cpu_cores: int = Field(gt=0,le=108, description="Number of CPU cores")
     ram_gb: int = Field(gt=0,le=1000, description="Amount of RAM in GB")
-    storage: Storage = Field(description="Storage details")
+    root_disk: str = Field(description="Root disk of the server")
+    root_disk_type: str = Field(description="Type of root disk storage")
+    total_capacity_gb: int = Field(gt=0,le=10000, description="Total storage capacity in GB")
+    used_capacity_gb: int = Field(ge=0,le=10000, description="Used storage capacity in GB")
+    free_capacity_gb: int = Field(ge=0,le=10000, description="Free storage capacity in GB")
     location: str = Field(description="Location of the server")
     owner: str = Field(description="Owner of the server")
     status: str = Field(description="Status of the server")
@@ -58,25 +64,23 @@ class Server(BaseModel):
     class Config:
         json_schema_extra = {
           "example": {
-            "hostname": "server3.example.com",
-            "short_name": "server3",
-            "ip_address": "192.168.56.103",
+            "hostname": "server1.example.com",
+            "short_name": "server1",
+            "ip_address": "192.168.56.101",
             "os": "Linux",
             "os_version": "Ubuntu 20.04",
             "cpu_model": "Intel Xeon E5-2670",
             "cpu_cores": 8,
             "ram_gb": 16,
-            "userid": 1,
-            "storage": {
-              "total_capacity_gb": 500,
-              "used_capacity_gb": 200,
-              "free_capacity_gb": 300,
-              "disk_type": "SSD"
-            },
+            "root_disk": "/dev/sda",
+            "root_disk_type": "SSD",
+            "total_capacity_gb": 1000,
+            "used_capacity_gb": 500,
+            "free_capacity_gb": 500,
             "location": "Data Center A",
             "owner": "IT Department",
-            "status": "active"
-            
+            "status": "active",
+            "userid": 1
         }
         }
 
@@ -84,8 +88,7 @@ class Server(BaseModel):
 
 @router.get("/", status_code=status.HTTP_200_OK, description="List all servers in inventory")
 async def list_all_servers(db: db_dependency): 
-    servers = db.query(models.Servers).options(joinedload(models.Servers.storage)).all()   
-    # servers = db.query(models.Servers).options(joinedload(models.Servers.storage)).filter(models.Servers.userid == user.get("id")).all()
+    servers = db.query(models.Servers).all()   
     if servers is None:
         raise HTTPException(status_code=404, detail="No servers found")
     return servers
@@ -95,7 +98,7 @@ async def get_server_by_hostname(hostname:str, db:db_dependency):
     server = db.query(models.Servers).filter(models.Servers.hostname == hostname).first()
     if server is None:
         raise HTTPException(status_code=404, detail="Server not found")
-    return db.query(models.Servers).filter(models.Servers.hostname == hostname).options(joinedload(models.Servers.storage)).first()
+    return db.query(models.Servers).filter(models.Servers.hostname == hostname).first()
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED, description="Create new server to inventory")
@@ -115,21 +118,16 @@ async def create_server(server_data:Server, db:db_dependency, user:user_dependen
         location=server_data.location,
         owner=server_data.owner,
         status=server_data.status,
+        root_disk=server_data.root_disk,
+        root_disk_type=server_data.root_disk_type,
+        total_capacity_gb=server_data.total_capacity_gb,
+        used_capacity_gb=server_data.used_capacity_gb,
+        free_capacity_gb=server_data.free_capacity_gb,
         userid=user.get("id")
     )
     
-    storage_data = server_data.storage
-    storage = models.Storage(
-        disk_type=storage_data.disk_type,
-        free_capacity_gb=storage_data.free_capacity_gb,
-        total_capacity_gb=storage_data.total_capacity_gb,
-        used_capacity_gb=storage_data.used_capacity_gb
-    )
-    
-    server.storage.append(storage)
     
     db.add(server)
-    db.add(storage)
     db.commit()
     db.refresh(server)
     
@@ -141,6 +139,7 @@ async def update_server(hostname:str, server_data:Server, db:db_dependency):
     if server is None:
         raise HTTPException(status_code=404, detail="Server not found")
     
+    server.hostname = server_data.hostname
     server.short_name = server_data.short_name
     server.ip_address = server_data.ip_address
     server.os = server_data.os
@@ -151,13 +150,11 @@ async def update_server(hostname:str, server_data:Server, db:db_dependency):
     server.location = server_data.location
     server.owner = server_data.owner
     server.status = server_data.status
-    
-    storage_data = server_data.storage
-    storage = db.query(models.Storage).filter(models.Storage.server_id == server.id).first()
-    storage.disk_type = storage_data.disk_type
-    storage.free_capacity_gb = storage_data.free_capacity_gb
-    storage.total_capacity_gb = storage_data.total_capacity_gb
-    storage.used_capacity_gb = storage_data.used_capacity_gb
+    server.root_disk = server_data.root_disk
+    server.root_disk_type = server_data.root_disk_type
+    server.total_capacity_gb = server_data.total_capacity_gb
+    server.used_capacity_gb = server_data.used_capacity_gb
+    server.free_capacity_gb = server_data.free_capacity_gb
     
     db.commit()
     db.refresh(server)
