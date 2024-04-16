@@ -20,9 +20,9 @@ class Servers(Base):
     status=Column(String)
     root_disk = Column(String)
     root_disk_type = Column(String)
-    total_capacity_gb = Column(String)
-    used_capacity_gb = Column(String)
-    free_capacity_gb = Column(String)
+    total_capacity_gb = Column(Integer)
+    used_capacity_gb = Column(Integer)
+    free_capacity_gb = Column(Integer)
     userid = Column(Integer, ForeignKey('users.id'))
     
 class Users(Base):

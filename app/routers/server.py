@@ -25,23 +25,6 @@ def get_db():
 db_dependency = Annotated[Session, Depends(get_db)]
 user_dependency = Annotated[dict, Depends(get_current_user)]
         
-# class Storage(BaseModel):
-#     total_capacity_gb: int = Field(gt=0,le=10000, description="Total storage capacity in GB")
-#     used_capacity_gb: int = Field(ge=0,le=10000, description="Used storage capacity in GB")
-#     free_capacity_gb: int = Field(ge=0,le=10000, description="Free storage capacity in GB")
-#     disk_type: str = Field(description="Type of disk storage (e.g. SSD, HDD)")
-    
-#     class Config:
-#         json_schema_extra = {
-#             "example": {
-#                 "total_capacity_gb": 500,
-#                 "used_capacity_gb": 200,
-#                 "free_capacity_gb": 300,
-#                 "disk_type": "SSD"
-#             }
-#         }
-
-
 class Server(BaseModel):
     hostname: str = Field(description="Fully qualified domain name (FQDN) of the server")
     short_name: str = Field(description="Short name of the server")
