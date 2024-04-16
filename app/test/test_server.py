@@ -8,7 +8,7 @@ from app.db.database import Base
 from app.routers.server import get_db, get_current_user
 from fastapi.testclient import TestClient
 import pytest
-from app.model.models import Servers, Storage, Users
+from app.model.models import Servers
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./testdb.db"
 
@@ -26,7 +26,7 @@ def override_get_db():
         db.close()
         
 def override_get_current_user():
-    return {"username": "samperay", "id": 1, "user_role": "admin"}
+    return {"username": "user1", "id": 1, "user_role": "admin"}
         
 app.dependency_overrides[get_db] = override_get_db
 app.dependency_overrides[get_current_user] = override_get_current_user
@@ -36,33 +36,7 @@ client = TestClient(app)
 
 @pytest.fixture
 def test_inventory():
-
-    server = Servers([
-        {
-            "ip_address": "192.168.1.1",
-            "hostname": "server1",
-            "os_version": "Ubuntu 20.04",
-            "cpu_cores": 8,
-            "location": "Data Center 1",
-            "status": "Active",
-            "userid": 1,
-            "short_name": "s1",
-            "id": 1,
-            "os": "Linux",
-            "cpu_model": "Intel Xeon",
-            "ram_gb": 16,
-            "owner": "Admin",
-            "storage": [
-            {
-                "free_capacity_gb": "500",
-                "id": 1,
-                "server_id": 1,
-                "total_capacity_gb": "1000",
-                "used_capacity_gb": "500",
-                "disk_type": "SSD"
-            }
-            ]
-        }])
+    server = Servers(hostname="server1.example.com", ip_address="192.168.56.101", os_version="Ubuntu 20.04", cpu_cores=8, location="Data Center 1", status="Active", short_name="server1", os="Linux", cpu_model="Intel Xeon", ram_gb=16, owner="Admin", userid=1,root_disk="/dev/sda",root_disk_type="SSD",total_capacity_gb=1000,used_capacity_gb=500,free_capacity_gb=500)
     
     db = TestingSessionLocal()
     db.add(server)
@@ -70,7 +44,6 @@ def test_inventory():
     db.refresh(server)
     yield server
 
-    # use teardown to clean up the database
     db.delete(server)
     db.commit()
     db.close()
@@ -79,31 +52,5 @@ def test_inventory():
 def test_read_all_authenticated(test_inventory):
     response = client.get("/inventory")
     assert response.status_code == status.HTTP_200_OK
-    
-    assert response.json() == [
-  {
-    "ip_address": "192.168.1.1",
-    "hostname": "server1",
-    "os_version": "Ubuntu 20.04",
-    "cpu_cores": 8,
-    "location": "Data Center 1",
-    "status": "Active",
-    "userid": 1,
-    "short_name": "s1",
-    "id": 1,
-    "os": "Linux",
-    "cpu_model": "Intel Xeon",
-    "ram_gb": 16,
-    "owner": "Admin",
-    "storage": [
-      {
-        "free_capacity_gb": "500",
-        "id": 1,
-        "server_id": 1,
-        "total_capacity_gb": "1000",
-        "used_capacity_gb": "500",
-        "disk_type": "SSD"
-      }
-    ]
-  }]
-     
+    assert response.json() == [{'hostname': 'server1.example.com', 'ip_address': '192.168.56.101', 'id': 1, 'os_version': 'Ubuntu 20.04', 'cpu_cores': 8, 'location': 'Data Center 1', 'status': 'Active', 'root_disk_type': 'SSD', 'used_capacity_gb': '500', 'userid': 1, 'short_name': 'server1', 'os': 'Linux', 'cpu_model': 'Intel Xeon', 'ram_gb': 16, 'owner': 'Admin', 'root_disk': '/dev/sda', 'total_capacity_gb': '1000', 'free_capacity_gb': '500'}]
+        
