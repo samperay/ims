@@ -4,6 +4,7 @@ from app.routers import server as server_router
 from app.routers import auth as auth_router
 from app.routers import admin as admin_router
 from app.routers import users as users_router
+from app.routers import index as index_router
 
 
 
@@ -13,6 +14,7 @@ app=FastAPI()
 async def healtz():
     return {"status":"ok"}
 
+app.include_router(index_router.router)
 app.include_router(server_router.router)
 app.include_router(auth_router.router)
 app.include_router(admin_router.router)
