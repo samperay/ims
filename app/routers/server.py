@@ -10,7 +10,7 @@ from app.db.curd import get_server_by_hostname
 from .auth import get_current_user
 
 
-router=APIRouter(prefix="/inventory",tags=["inventory"])
+router=APIRouter(prefix="/server",tags=["inventory"])
 
 
 models.Base.metadata.create_all(bind=engine)
